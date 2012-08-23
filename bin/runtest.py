@@ -33,13 +33,14 @@ class CaptureServer(object):
     end_frame = None
 
     def __init__(self, capture_metadata, capture_file,
-                 checkerboard_log_file, capture_controller, device, actions):
+                 checkerboard_log_file, capture_controller, device, actions, gestures=None):
         self.capture_metadata = capture_metadata
         self.capture_file = capture_file
         self.checkerboard_log_file = checkerboard_log_file
         self.capture_controller = capture_controller
         self.device = device
         self.actions = actions
+        self.gestures = gestures or None
 
     def terminate_capture(self):
         if self.capture_file and self.capture_controller.capturing:
@@ -60,11 +61,23 @@ class CaptureServer(object):
     def end_capture(self, request):
         self.finished = True
         self.terminate_capture()
+        print "finished capturing"
         return (200, {'capturing': False})
 
     @mozhttpd.handlers.json_response
     def input(self, request):
-        if self.actions: # startup test currently indicated by no actions
+        if self.gestures:
+            if self.checkerboard_log_file:
+                self.device.clear_logcat()
+            if self.capture_file:
+                print "capture file!"
+                self.start_frame = self.capture_controller.capture_framenum()
+            print "start frame num: %s" % self.capture_controller.capture_framenum()
+            print "running %s" % self.gestures
+            output = StringIO.StringIO()
+            self.device.shell(["sh", self.gestures], output)
+            print "ran them %s" % output.getvalue()
+        elif self.actions: # startup test currently indicated by no actions
             commandset = urlparse.parse_qs(request.body)['commands'][0]
 
             if not self.actions.get(commandset) or not \
@@ -126,6 +139,9 @@ def main(args=sys.argv[1:]):
     parser.add_option("--b2g", action="store_true",
                       dest="b2g", default=False,
                       help="Run in B2G environment. You do not need to pass an appname")
+    parser.add_option("--gesture_file", action="store",
+                      dest="gesture_file", default=None,
+                      help="Path to gesture file on the phone. Will execute this file after test URL loads.")
 
     options, args = parser.parse_args()
     testpath, appname = None, None
@@ -175,6 +191,7 @@ def main(args=sys.argv[1:]):
         capture_name = testpath_rel
     capture_file = options.capture_file
     if not capture_file and not options.no_capture:
+        print "creating capture file in %s" % CAPTURE_DIR
         capture_file = os.path.join(CAPTURE_DIR, "capture-%s.zip" %
                                          datetime.datetime.now().isoformat())
 
@@ -204,7 +221,7 @@ def main(args=sys.argv[1:]):
     capture_server = CaptureServer(capture_metadata,
                                    capture_file,
                                    options.checkerboard_log_file,
-                                   capture_controller, device, actions)
+                                   capture_controller, device, actions, options.gesture_file)
     host = mozhttpd.iface.get_lan_ip()
     http = mozhttpd.MozHttpd(docroot=TEST_DIR,
                              host=host, port=0,
@@ -288,7 +305,6 @@ def main(args=sys.argv[1:]):
         sys.exit(1)
 
     runner.stop()
-
     if capture_file:
         print "Converting capture..."
         try:
