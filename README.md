@@ -21,14 +21,14 @@ experimental support for B2G on the pandaboard.
 * Installed Android SDK with the tools in your path. Please follow the
   instructions at https://wiki.mozilla.org/Mobile/Fennec/Android#Setup_a_Build_Environment
 
-* A supported mobile phone running Android with Orangutan installed in `/system/xbin`.
-  Eideticker's tests are specifically tuned for specific screen dimensions. Currently
-  only the LG G2X (running in portrait mode) and the Galaxy Nexus (running in landscape)
-  are supported. Your device must also be rooted and, if using SUTAgent, you
-  must configure the su binary to automatically allow SUTAgent to run commands
-  as root in silent mode (so that notifications don't pop up while running
-  tests). For information on installing Orangutan, see that project's README
-  at http://github.com/wlach/orangutan.
+* A supported mobile phone running Android with Orangutan installed in
+  `/system/ Eideticker's tests are specifically tuned for specific screen
+  dimensions. Currently only the LG G2X (running in portrait mode) and the
+  Galaxy Nexus (running in landscape) are supported. Your device must also be
+  rooted and, if using SUTAgent, you must configure the su binary to
+  automatically allow SUTAgent to run commands as root in silent mode (so that
+  notifications don't pop up while running tests). For information on installing
+  Orangutan, see that project's README at http://github.com/wlach/orangutan.
 
 ### Installation
 
@@ -53,8 +53,9 @@ ip address of your phone, then set the following environment variables:
 
 If you are using a B2G pandaboard with adb, then you'll need sudo privileges for adb:
 
-    adb kill-server 
+    adb kill-server
     sudo adb start-server
+
 #### Console Mode
 
 Console mode is meant for internal profiling. You run a program

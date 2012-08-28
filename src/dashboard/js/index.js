@@ -9,12 +9,12 @@ function parseDate(datestr) {
   return Date.UTC(year, month, day);
 }
 
-function updateContent(graphTitle, testName, measure) {
+function updateContent(graphTitle, deviceId, testId, measureId) {
 
   var measureDescription;
-  if (measure === "checkerboard") {
+  if (measureId === "checkerboard") {
     measureDescription = 'The measure is the sum of the percentages of frames that are checkerboarded over the entire capture. Lower values are better.';
-  } else if (measure === "fps") {
+  } else if (measureId === "fps") {
     measureDescription = 'The measure is a calculation of the average number of UNIQUE frames per second of capture. The theoretical maximum is 60 fps (which is what we are capturing), but note that if there periods where the page being captured is unchanging this number may be aritifically low.';
   } else {
     measureDescription = 'The measure is a calculation of the total number of UNIQUE frames in the capture. Higher values generally indicate more fluid animations.';
@@ -23,10 +23,10 @@ function updateContent(graphTitle, testName, measure) {
   $('#content').html(ich.graph({'title': graphTitle,
                                 'measureDescription': measureDescription
                                }));
-  $('#measure-'+measure).attr("selected", "true");
+  $('#measure-'+measureId).attr("selected", "true");
   $('#measure').change(function() {
     var newMeasure = $(this).val();
-    window.location.hash = '/' + [ testName, newMeasure ].join('/');
+    window.location.hash = '/' + [ deviceId, testId, newMeasure ].join('/');
   });
 }
 
@@ -62,10 +62,12 @@ function updateGraph(rawdata, measure) {
 
     // line graph (aggregate average per day)
     var series2 = {
+      hoverLabel: "Average per day for " + type,
       lines: { show: true },
       color: color,
       data: [],
-      clickable: false
+      clickable: false,
+      hoverable: false
     };
     Object.keys(rawdata[type]).forEach(function(datestr) {
       var numSamples = 0;
@@ -116,6 +118,47 @@ function updateGraph(rawdata, measure) {
         plot.zoomOut();
   });
 
+  function showTooltip(x, y, contents) {
+      $('<div id="tooltip">' + contents + '</div>').css( {
+          position: 'absolute',
+          display: 'none',
+          top: y + 5,
+          left: x + 5,
+          border: '1px solid #fdd',
+          padding: '2px',
+          'background-color': '#fee',
+          opacity: 0.80
+      }).appendTo("body").fadeIn(200);
+  }
+
+  // Plot Hover tooltip
+  var previousPoint = null;
+  $("#graph-container").bind("plothover", function (event, pos, item) {
+    if (item) {
+      if (previousPoint != item.dataIndex) {
+        var toolTip;
+        var x = item.datapoint[0].toFixed(2),
+            y = item.datapoint[1].toFixed(2);
+
+        if (metadataHash[item.seriesIndex] && metadataHash[item.seriesIndex][item.dataIndex]) {
+          var metadata = metadataHash[item.seriesIndex][item.dataIndex];
+          toolTip = (item.series.label || item.series.hoverLabel) + " of " + (metadata.appDate || "'Unknown Date'") + " = " + y;
+        } else {
+          console.log(JSON.stringify(item.series));
+          toolTip = (item.series.label || item.series.hoverLabel) + " = " + y;
+        }
+
+        previousPoint = item.dataIndex;
+
+        $("#tooltip").remove();
+        showTooltip(item.pageX, item.pageY, toolTip);
+      }
+    } else {
+      $("#tooltip").remove();
+      previousPoint = null;
+    }
+  });
+
   $("#graph-container").bind("plotclick", function (event, pos, item) {
     plot.unhighlight();
     if (item) {
@@ -142,59 +185,102 @@ $(function() {
   var testInfoDict = {
     'taskjs-scrolling': {
       'key': 'taskjs',
-      'graphTitle': 'Scrolling on taskjs.org'
+      'graphTitle': 'Scrolling on taskjs.org',
+      'defaultMeasure': 'checkerboard'
     },
     'nightly-zooming': {
       'key': 'nightly',
-      'graphTitle': 'Mozilla Nightly Zooming Test'
+      'graphTitle': 'Mozilla Nightly Zooming Test',
+      'defaultMeasure': 'checkerboard'
     },
     'nytimes-scrolling': {
       'key': 'nytimes-scroll',
-      'graphTitle': 'New York Times Scrolling Test'
+      'graphTitle': 'New York Times Scrolling Test',
+      'defaultMeasure': 'checkerboard'
     },
     'nytimes-zooming': {
       'key': 'nytimes-zoom',
-      'graphTitle': 'New York Times Zooming Test'
+      'graphTitle': 'New York Times Zooming Test',
+      'defaultMeasure': 'checkerboard'
     },
     'cnn': {
       'key': 'cnn',
-      'graphTitle': 'CNN.com Test'
+      'graphTitle': 'CNN.com Test',
+      'defaultMeasure': 'checkerboard'
     },
     'canvas-clock': {
       'key': 'clock',
-      'graphTitle': 'Canvas Clock Test'
+      'graphTitle': 'Canvas Clock Test',
+      'defaultMeasure': 'fps'
     },
     'reddit': {
       'key': 'reddit',
-      'graphTitle': 'Reddit test'
+      'graphTitle': 'Reddit test',
+      'defaultMeasure': 'checkerboard'
     },
     'imgur': {
       'key': 'imgur',
-      'graphTitle': 'imgur test'
+      'graphTitle': 'imgur test',
+      'defaultMeasure': 'checkerboard'
     },
     'wikipedia': {
       'key': 'wikipedia',
-      'graphTitle': 'wikipedia test'
+      'graphTitle': 'wikipedia test',
+      'defaultMeasure': 'checkerboard'
     }
   }
 
-  var baseRoute = "/(" + Object.keys(testInfoDict).join("|") + ")";
-  var tmp = {};
-  tmp[baseRoute] = {
-    '/(checkerboard|fps|uniqueframes)': {
-      on: function(test, measure) {
-        $('#functions').children('li').removeClass("active");
-        $('#functions').children('#'+test+'-li').addClass("active");
+  Object.keys(testInfoDict).forEach(function(testkey) {
+    $('<li id="' + testkey + '-li" testid = ' + testkey + '><a>' + testkey + '</a></li>').appendTo($('#test-chooser'));
+  });
 
-        var testInfo = testInfoDict[test];
-        updateContent(testInfo.graphTitle, test, measure);
+  var graphData = {};
+  $.getJSON('devices.json', function(rawData) {
+    var devices = rawData['devices'];
+    var deviceIds = Object.keys(devices);
+    var routes = {};
+    deviceIds.forEach(function(deviceId) {
+      $('<li id="device-' + deviceId + '-li" deviceid= ' + deviceId + '><a>'+devices[deviceId].name+'</a></li>').appendTo($('#device-chooser'));
 
-        $.getJSON('data.json', function(rawData) {
-          updateGraph(rawData[testInfo.key], measure);
-        });
+      var baseRoute = "/(" + deviceId + ")/(" + Object.keys(testInfoDict).join("|") + ")";
+      routes[baseRoute] = {
+        '/(checkerboard|fps|uniqueframes)': {
+          on: function(deviceId, testId, measure) {
+            console.log("ON: " + [deviceId,testId,measure]);
+
+            // update all links to be relative to the new test or device
+            $('#device-chooser').children('li').removeClass("active");
+            $('#device-chooser').children('#device-'+deviceId+'-li').addClass("active");
+            $('#device-chooser').children('li').each(function() {
+              $(this).children('a').attr('href', '#/' + [ $(this).attr('deviceid'),
+                                                          testId,
+                                                          measure ].join('/'));
+            });
+
+            $('#test-chooser').children('li').removeClass("active");
+            $('#test-chooser').children('#'+testId+'-li').addClass("active");
+
+            $('#test-chooser').children('li').each(function() {
+              var testIdAttr = $(this).attr('testid');
+              if (testIdAttr) {
+                var defaultMeasure = testInfoDict[testIdAttr].defaultMeasure;
+                $(this).children('a').attr('href', '#/' +
+                                           [ deviceId, testIdAttr,
+                                             defaultMeasure ].join('/'));
+              }
+            });
+
+            var testInfo = testInfoDict[testId];
+            updateContent(testInfo.graphTitle, deviceId, testId, measure);
+
+            // update graph
+            $.getJSON('data-' + deviceId + '.json', function(graphDataForDevice) {
+              updateGraph(graphDataForDevice[testInfo.key], measure);
+            });
+          }
+        }
       }
-    }
-  };
-  var router = Router(tmp).init('/taskjs-scrolling/checkerboard');
-
+    });
+    var router = Router(routes).init('/' + deviceIds[0] + '/taskjs-scrolling/checkerboard');
+  });
 });

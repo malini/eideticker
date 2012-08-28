@@ -65,9 +65,9 @@ class EidetickerMixin(object):
         retval = self.shell(args, buf)
         output = str(buf.getvalue()[0:-1]).rstrip()
         if retval == None:
-            raise Exception("Did not successfully run command %s (output: '%s')" % (args, output))
+            raise Exception("Did not successfully run command %s (output: '%s', retval: 'None')" % (args, output))
         if retval != 0:
-            raise Exception("Non-zero return code for command: %s (output: '%s')" % (args, output))
+            raise Exception("Non-zero return code for command: %s (output: '%s', retval: '%i')" % (args, output, retval))
         return output
 
     def _executeScript(self, events, executeCallback=None):

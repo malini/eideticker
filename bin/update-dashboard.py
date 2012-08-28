@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 import videocapture
+import uuid
 import zipfile
 from eideticker.products import default_products
 
@@ -117,6 +118,7 @@ def runtest(dm, product, current_date, appname, appinfo, test, capture_name,
     if not data[test['name']][product['name']].get(current_date):
         data[test['name']][product['name']][current_date] = []
     datapoint = { 'fps': fps,
+                  'uuid': uuid.uuid1().hex,
                   'checkerboard': checkerboard,
                   'uniqueframes': num_unique_frames,
                   'video': video_path,
@@ -136,6 +138,8 @@ def main(args=sys.argv[1:]):
     parser.add_option("--no-download",
                       action="store_true", dest = "no_download",
                       help = "Don't download new versions of the app")
+    parser.add_option("--device-id", action="store", dest="device_id",
+                      help="id of device (used in output json)")
     parser.add_option("--product",
                       action="store", dest="product",
                       help = "Restrict testing to product (options: %s)" %
@@ -160,6 +164,13 @@ def main(args=sys.argv[1:]):
     else:
         test = [test for test in default_tests if test['name'] == testname][0]
 
+    device_id = options.device_id
+    if not device_id:
+        device_id = os.environ.get('DEVICE_ID')
+    if not device_id:
+        print "ERROR: Must specify device id (either with --device-id or with DEVICE_ID environment variable)"
+        sys.exit(1)
+
     products = default_products
     if options.product:
         products = [product for product in default_products if product['name'] == options.product]
@@ -168,13 +179,23 @@ def main(args=sys.argv[1:]):
             sys.exit(1)
 
     current_date = time.strftime("%Y-%m-%d")
-    datafile = os.path.join(outputdir, 'data.json')
+    datafile = os.path.join(outputdir, 'data-%s.json' % device_id)
 
     data = NestedDict()
     if os.path.isfile(datafile):
         data.update(json.loads(open(datafile).read()))
 
     device = eideticker.getDevice(options)
+
+    # update the device list for the dashboard
+    devices = {}
+    devicefile = os.path.join(outputdir, 'devices.json')
+    if os.path.isfile(devicefile):
+        devices = json.loads(open(devicefile).read())['devices']
+    devices[device_id] = { 'name': device.model,
+                           'version': device.getprop('ro.build.version.release') }
+    with open(devicefile, 'w') as f:
+        f.write(json.dumps({ 'devices': devices }))
 
     for product in products:
         if product.get('url'):
