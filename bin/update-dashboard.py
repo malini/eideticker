@@ -62,6 +62,7 @@ default_tests = [
 
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "../downloads")
 CAPTURE_DIR = os.path.join(os.path.dirname(__file__), "../captures")
+GECKO_PROFILER_ADDON_DIR = os.path.join(os.path.dirname(__file__), "../src/GeckoProfilerAddon")
 
 def kill_app(dm, appname):
     procs = dm.getProcessList()
@@ -69,23 +70,40 @@ def kill_app(dm, appname):
       if name == appname:
         dm.runCmd(["shell", "echo kill %s | su" % pid])
 
+def symbolicate_profile_package(profile_package, profile_path, profile_file):
+    retval = subprocess.call(["./symbolicate.sh",
+                              os.path.abspath(profile_package), os.path.abspath(profile_file)],
+                              cwd=GECKO_PROFILER_ADDON_DIR)
+    if retval == 0:
+        return profile_path
+    else:
+        return None
+
 def runtest(dm, product, current_date, appname, appinfo, test, capture_name,
-            outputdir, datafile, data):
+            outputdir, datafile, data, enable_profiling=False):
     capture_file = os.path.join(CAPTURE_DIR,
                                 "%s-%s-%s-%s.zip" % (test['name'],
                                                      appname,
                                                      appinfo.get('date'),
                                                      int(time.time())))
+    if enable_profiling:
+        profile_package = os.path.join(CAPTURE_DIR,
+                                       "profile-package-%s-%s-%s-%s.zip" % (test['name'],
+                                                                            appname,
+                                                                            appinfo.get('date'),
+                                                                            int(time.time())))
+
     urlparams = test.get('urlparams', '')
 
     test_completed = False
     for i in range(3):
         print "Running test (try %s of 3)" % (i+1)
 
-        retval = subprocess.call(["runtest.py", "--url-params", urlparams,
-                                  "--name", capture_name,
-                                  "--capture-file", capture_file,
-                                  appname, test['path']])
+        args = ["runtest.py", "--url-params", urlparams,
+                "--name", capture_name, "--capture-file", capture_file ]
+        if enable_profiling:
+            args.extend(["--profile-file", profile_package])
+        retval = subprocess.call(args + [ appname, test['path'] ])
         if retval == 0:
             test_completed = True
             break
@@ -103,6 +121,13 @@ def runtest(dm, product, current_date, appname, appinfo, test, capture_name,
     video_path = os.path.join('videos', 'video-%s.webm' % time.time())
     video_file = os.path.join(outputdir, video_path)
     open(video_file, 'w').write(capture.get_video().read())
+
+    #  profile file
+    if enable_profiling:
+        profile_path = os.path.join('profiles', 'sps-profile-%s.zip' % time.time())
+        profile_file = os.path.join(outputdir, profile_path)
+        symbolicated_profile_path = symbolicate_profile_package(profile_package, profile_path, profile_file)
+        os.remove(profile_package)
 
     # frames-per-second / num unique frames
     num_unique_frames = videocapture.get_num_unique_frames(capture)
@@ -125,6 +150,9 @@ def runtest(dm, product, current_date, appname, appinfo, test, capture_name,
                   'appdate': appinfo.get('date'),
                   'buildid': appinfo.get('buildid'),
                   'revision': appinfo.get('revision') }
+    if enable_profiling:
+        datapoint['profile'] = symbolicated_profile_path
+
     data[test['name']][product['name']][current_date].append(datapoint)
 
     # Write the data to disk immediately (so we don't lose it if we fail later)
@@ -135,9 +163,9 @@ def main(args=sys.argv[1:]):
     usage = "usage: %prog [options] <test> <output dir>"
 
     parser = eideticker.OptionParser(usage=usage)
-    parser.add_option("--no-download",
-                      action="store_true", dest = "no_download",
-                      help = "Don't download new versions of the app")
+    parser.add_option("--enable-profiling",
+                      action="store_true", dest = "enable_profiling",
+                      help = "Create SPS profile to go along with capture")
     parser.add_option("--device-id", action="store", dest="device_id",
                       help="id of device (used in output json)")
     parser.add_option("--product",
@@ -220,7 +248,8 @@ def main(args=sys.argv[1:]):
 
             # Now run the test
             runtest(device, product, current_date, appname, appinfo, test,
-                    capture_name + " #%s" % i, outputdir, datafile, data)
+                    capture_name + " #%s" % i, outputdir, datafile, data,
+                    enable_profiling=options.enable_profiling)
 
             # Kill app after test complete
             device.killProcess(appname)

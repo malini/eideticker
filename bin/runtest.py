@@ -142,6 +142,9 @@ def main(args=sys.argv[1:]):
     parser.add_option("--gesture_file", action="store",
                       dest="gesture_file", default=None,
                       help="Path to gesture file on the phone. Will execute this file after test URL loads.")
+    parser.add_option("--profile-file", action="store",
+                      type="string", dest = "profile_file",
+                      help="Collect a performance profile using the built in profiler.")
 
     options, args = parser.parse_args()
     testpath, appname = None, None
@@ -276,7 +279,7 @@ def main(args=sys.argv[1:]):
     if options.startup_test and not options.no_capture:
         capture_controller.start_capture(capture_file, device.hdmiResolution,
                                          capture_metadata)
-    runner.start()
+    runner.start(profile_file=options.profile_file)
 
     # Keep on capturing until we timeout
     if capture_timeout:

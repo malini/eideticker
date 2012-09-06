@@ -49,11 +49,22 @@ function updateGraph(rawdata, measure) {
       data: []
     };
 
+
+    var prevRevision = null;
     Object.keys(rawdata[type]).sort().forEach(function(datestr) {
       rawdata[type][datestr].forEach(function(sample) {
         series1.data.push([ parseDate(datestr), sample[measure] ]);
-        metadataHash[seriesIndex].push({'videoURL': sample.video, 'dateStr': datestr, 'appDate': sample.appdate, 'revision': sample.revision, 'buildId': sample.buildid });
+        metadataHash[seriesIndex].push({
+          'videoURL': sample.video,
+          'dateStr': datestr,
+          'appDate': sample.appdate,
+          'revision': sample.revision,
+          'prevRevision': prevRevision,
+          'buildId': sample.buildid,
+          'profileURL': sample.profile
+        });
       });
+      prevRevision = rawdata[type][datestr][0].revision;
     });
     graphdata.push(series1);
 
@@ -164,10 +175,12 @@ function updateGraph(rawdata, measure) {
     if (item) {
       var metadata = metadataHash[item.seriesIndex][item.dataIndex];
       $('#datapoint-info').html(ich.graphDatapoint({ 'videoURL': metadata.videoURL,
+                                                     'profileURL': metadata.profileURL,
                                                      'measureName': measure,
                                                      'date': metadata.dateStr,
                                                      'appDate': metadata.appDate,
                                                      'revision': metadata.revision,
+                                                     'prevRevision': metadata.prevRevision,
                                                      'buildId': metadata.buildId,
                                                      'measureValue': Math.round(100.0*item.datapoint[1])/100.0
                                                    }));
@@ -246,8 +259,6 @@ $(function() {
       routes[baseRoute] = {
         '/(checkerboard|fps|uniqueframes)': {
           on: function(deviceId, testId, measure) {
-            console.log("ON: " + [deviceId,testId,measure]);
-
             // update all links to be relative to the new test or device
             $('#device-chooser').children('li').removeClass("active");
             $('#device-chooser').children('#device-'+deviceId+'-li').addClass("active");
@@ -281,6 +292,15 @@ $(function() {
         }
       }
     });
-    var router = Router(routes).init('/' + deviceIds[0] + '/taskjs-scrolling/checkerboard');
+
+    var defaultDeviceId = deviceIds[0];
+    // HACK: try to default to the LG-P999 for now
+    deviceIds.forEach(function(deviceId) {
+      if (devices[deviceId].name === "LG-P999") {
+        defaultDeviceId = deviceId;
+      }
+    });
+
+    var router = Router(routes).init('/' + defaultDeviceId + '/taskjs-scrolling/checkerboard');
   });
 });

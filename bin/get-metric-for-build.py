@@ -57,7 +57,7 @@ def get_build_for_date(date):
 
 def run_test(device, outputdir, outputfile, test, url_params, num_runs,
              startup_test, no_capture, get_internal_checkerboard_stats, apk=None,
-             appname = None, appdate = None):
+             appname = None, appdate = None, profile_file=None):
     if apk:
         appinfo = eideticker.get_fennec_appinfo(apk)
         appname = appinfo['appname']
@@ -88,6 +88,8 @@ def run_test(device, outputdir, outputfile, test, url_params, num_runs,
             args.extend(["--no-capture"])
         else:
             args.extend(["--capture-file", capture_file])
+        if profile_file:
+            args.extend(["--profile-file", profile_file])
         print args
         retval = subprocess.call(args)
         if retval != 0:
@@ -183,6 +185,9 @@ def main(args=sys.argv[1:]):
                       dest = "no_capture",
                       help = "run through the test, but don't actually "
                       "capture anything")
+    parser.add_option("--profile-file", action="store",
+                      type="string", dest = "profile_file",
+                      help="Collect a performance profile using the built in profiler.")
     parser.add_option("--get-internal-checkerboard-stats",
                       action="store_true",
                       dest="get_internal_checkerboard_stats",
@@ -247,7 +252,8 @@ def main(args=sys.argv[1:]):
                      options.num_runs,
                      options.startup_test,
                      options.no_capture,
-                     options.get_internal_checkerboard_stats, appname=appname)
+                     options.get_internal_checkerboard_stats, appname=appname,
+                     profile_file=options.profile_file)
     elif apks:
         for apk in apks:
             run_test(device, options.outputdir,
@@ -256,7 +262,8 @@ def main(args=sys.argv[1:]):
                      options.num_runs,
                      options.startup_test,
                      options.no_capture,
-                     options.get_internal_checkerboard_stats, apk=apk)
+                     options.get_internal_checkerboard_stats, apk=apk,
+                     profile_file=options.profile_file)
     else:
         for date in dates:
             apk = get_build_for_date(date)
@@ -267,7 +274,8 @@ def main(args=sys.argv[1:]):
                      options.startup_test,
                      options.no_capture,
                      options.get_internal_checkerboard_stats, apk=apk,
-                     appdate=date)
+                     appdate=date,
+                     profile_file=options.profile_file)
 
 
 main()

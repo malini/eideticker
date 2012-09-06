@@ -62,7 +62,7 @@ class EidetickerMixin(object):
     # FIXME: make this part of devicemanager
     def _shellCheckOutput(self, args):
         buf = StringIO.StringIO()
-        retval = self.shell(args, buf)
+        retval = self.shell(args, buf, root=True)
         output = str(buf.getvalue()[0:-1]).rstrip()
         if retval == None:
             raise Exception("Did not successfully run command %s (output: '%s', retval: 'None')" % (args, output))
@@ -82,6 +82,38 @@ class EidetickerMixin(object):
                 executeCallback()
             self._shellCheckOutput(["/system/xbin/orng", self.inputDevice,
                                     remotefilename])
+
+    def getPIDs(self, appname):
+        '''FIXME: Total hack, put this in devicemanagerADB instead'''
+        procs = self.getProcessList()
+        pids = []
+        for (pid, name, user) in procs:
+            if name == appname:
+                pids.append(pid)
+        return pids
+
+    def sendSaveProfileSignal(self, appName):
+        pids = self.getPIDs(appName)
+        if pids:
+            self._shellCheckOutput(['kill', '-s', '12', pids[0]])
+
+    def getAPK(self, appname, localfile):
+        remote_tempfile = '/data/local/apk-tmp-%s' % time.time()
+        for remote_apk_path in [ '/data/app/%s-1.apk' % appname,
+                                 '/data/app/%s-2.apk' % appname ]:
+            try:
+                self._shellCheckOutput(['dd', 'if=%s' % remote_apk_path,
+                                        'of=%s' % remote_tempfile])
+                self._shellCheckOutput(['chmod', '0666', remote_tempfile])
+                self.removeFile(remote_tempfile)
+            except:
+                continue
+
+            if self.getFile(remote_tempfile, localfile):
+                return
+
+        raise Exception("Unable to get remote APK for %s!" % appname)
+
 
     def getprop(self, prop):
         return self._shellCheckOutput(["getprop", str(prop)])
@@ -193,7 +225,7 @@ class DroidADB(mozdevice.DroidADB, EidetickerMixin):
 
     @property
     def rotation(self):
-        return 0
+        return 0 # No way to find real rotation, assume 0
 
 class DroidSUT(mozdevice.DroidSUT, EidetickerMixin):
 

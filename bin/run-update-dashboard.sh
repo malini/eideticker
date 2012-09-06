@@ -5,6 +5,14 @@ set -e
 EIDETICKER=$(dirname $0)/../
 TESTS="clock taskjs nightly cnn nytimes-scroll nytimes-zoom reddit wikipedia imgur"
 
+if [ -z $NUM_RUNS ]; then
+    NUM_RUNS=5
+fi
+
+if [ -z $EXPIRY_THRESHOLD ]; then
+    EXPIRY_THRESHOLD=3
+fi
+
 if [ $# -gt 0 ]; then
     TESTS=$@
 fi
@@ -15,7 +23,7 @@ cd $EIDETICKER
 . bin/activate
 
 # Expire old captures/videos
-./bin/expire.py
+./bin/expire.py --max-age $EXPIRY_THRESHOLD
 
 # Update apps on the phone to the latest
 ./bin/update-phone.py
@@ -25,5 +33,5 @@ for TEST in $TESTS; do
   # from unsuccessful runs kicking around)
   rm -rf /tmp/eideticker/*
   echo "Running $TEST"
-  ./bin/update-dashboard.py --product nightly --num-runs 5 $TEST src/dashboard
+  ./bin/update-dashboard.py --product nightly --num-runs $NUM_RUNS $TEST src/dashboard
 done

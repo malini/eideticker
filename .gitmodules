@@ -25,3 +25,6 @@
 [submodule "src/marionette_client"]
 	path = src/marionette_client
 	url = git://github.com/mozilla/marionette_client
+[submodule "src/GeckoProfilerAddon"]
+	path = src/GeckoProfilerAddon
+	url = https://github.com/bgirard/Gecko-Profiler-Addon.git
