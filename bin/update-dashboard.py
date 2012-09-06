@@ -245,7 +245,7 @@ def main(args=sys.argv[1:]):
     devicefile = os.path.join(outputdir, 'devices.json')
     if os.path.isfile(devicefile):
         devices = json.loads(open(devicefile).read())['devices']
-            
+
     if device_id == 'Panda' and (options.product and options.product == 'b2g'):
         b2g_manager = B2GManager(device)
         appinfo = b2g_manager.get_appinfo()
@@ -266,7 +266,7 @@ def main(args=sys.argv[1:]):
             def call_runtest():
                  runtest(device, product, current_date, appinfo, test,
                          capture_name + " #%s" % i, outputdir, datafile, data,
-                         gesture_file=options.gesture_file, 
+                         gesture_file=options.gesture_file,
                          enable_profiling=options.enable_profiling)
 
         else:
@@ -279,24 +279,24 @@ def main(args=sys.argv[1:]):
                 appinfo = { }
                 appname = product['appname']
                 capture_name = "%s (taken on %s)" % (product['name'], current_date)
-    
+ 
             if appinfo.get('appname'):
                 appname = appinfo['appname']
             else:
                 appname = product['appname']
-    
+ 
                 def call_runtest():
                     # Kill any existing instances of the processes
                     device.killProcess(appname)
-        
+ 
                     # Now run the test
                     runtest(device, product, current_date, appinfo, test,
-                            capture_name + " #%s" % i, outputdir, datafile, data, 
+                            capture_name + " #%s" % i, outputdir, datafile, data,
                             appname=appname, enable_profiling=options.enable_profiling)
-        
+ 
                     # Kill app after test complete
                     device.killProcess(appname)
-    
+ 
         # Run the test the specified number of times
         for i in range(num_runs):
             # Now run the test

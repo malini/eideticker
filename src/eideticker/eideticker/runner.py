@@ -27,7 +27,7 @@ class B2GRunner(object):
 
     def start(self):
         prefs = """
-user_pref("power.screen.timeout", 999999);  
+user_pref("power.screen.timeout", 999999);
         """
         print "forward port"
         self.bm.forward_port()
