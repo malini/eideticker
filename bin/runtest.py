@@ -69,7 +69,6 @@ class CaptureServer(object):
             if self.checkerboard_log_file:
                 self.device.clear_logcat()
             if self.capture_file:
-                print "capture file!"
                 self.start_frame = self.capture_controller.capture_framenum()
             output = StringIO.StringIO()
             self.device.shell(["sh", self.gestures], output)

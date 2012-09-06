@@ -247,10 +247,8 @@ def main(args=sys.argv[1:]):
         devices = json.loads(open(devicefile).read())['devices']
             
     if device_id == 'Panda' and (options.product and options.product == 'b2g'):
-        print "creating manager"
         b2g_manager = B2GManager(device)
         appinfo = b2g_manager.get_appinfo()
-        print "gotmanager"
         appinfo["buildid"] = appinfo["appBuildID"]
         appinfo["revision"] = appinfo["version"]
         devices[device_id] = { 'name': device.model,
