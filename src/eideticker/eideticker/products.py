@@ -8,5 +8,10 @@ default_products = [
         "name": "stock",
         "url": None,
         "appname": "com.android.browser"
+    },
+    {
+        "name": "b2g",
+        "url": None,
+        "appname": None
     }
 ]
