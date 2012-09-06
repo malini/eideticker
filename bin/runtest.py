@@ -61,7 +61,6 @@ class CaptureServer(object):
     def end_capture(self, request):
         self.finished = True
         self.terminate_capture()
-        print "finished capturing"
         return (200, {'capturing': False})
 
     @mozhttpd.handlers.json_response
@@ -72,11 +71,8 @@ class CaptureServer(object):
             if self.capture_file:
                 print "capture file!"
                 self.start_frame = self.capture_controller.capture_framenum()
-            print "start frame num: %s" % self.capture_controller.capture_framenum()
-            print "running %s" % self.gestures
             output = StringIO.StringIO()
             self.device.shell(["sh", self.gestures], output)
-            print "ran them %s" % output.getvalue()
         elif self.actions: # startup test currently indicated by no actions
             commandset = urlparse.parse_qs(request.body)['commands'][0]
 
@@ -194,7 +190,6 @@ def main(args=sys.argv[1:]):
         capture_name = testpath_rel
     capture_file = options.capture_file
     if not capture_file and not options.no_capture:
-        print "creating capture file in %s" % CAPTURE_DIR
         capture_file = os.path.join(CAPTURE_DIR, "capture-%s.zip" %
                                          datetime.datetime.now().isoformat())
 
