@@ -139,7 +139,7 @@ def main(args=sys.argv[1:]):
     parser.add_option("--b2g", action="store_true",
                       dest="b2g", default=False,
                       help="Run in B2G environment. You do not need to pass an appname")
-    parser.add_option("--gesture_file", action="store",
+    parser.add_option("--gesture-file", action="store",
                       dest="gesture_file", default=None,
                       help="Path to gesture file on the phone. Will execute this file after test URL loads.")
     parser.add_option("--profile-file", action="store",

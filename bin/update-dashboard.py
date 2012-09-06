@@ -12,6 +12,7 @@ import videocapture
 import uuid
 import zipfile
 from eideticker.products import default_products
+from mozdevice import B2GManager
 
 class NestedDict(dict):
     def __getitem__(self, key):
@@ -26,16 +27,19 @@ default_tests = [
     },
     {
         'name': 'taskjs',
-        'path': 'src/tests/ep1/taskjs.org/index.html'
+        'path': 'src/tests/ep1/taskjs.org/index.html',
+        'gesture_file': '/data/local/converted_taskjs'
     },
     {
         'name': 'nightly',
-        'path': 'src/tests/ep1/nightly.mozilla.org/index.html'
+        'path': 'src/tests/ep1/nightly.mozilla.org/index.html',
+        'gesture_file': '/data/local/converted_nightly'
     },
     {
         'name': 'nytimes-scroll',
         'path': 'src/tests/ep1/nytimes/nytimes.com/index.html',
-        'urlparams': 'testtype=scroll'
+        'urlparams': 'testtype=scroll',
+        'gesture_file': '/data/local/converted_nytimes_scroll'
     },
     {
         'name': 'nytimes-zoom',
@@ -44,19 +48,23 @@ default_tests = [
     },
     {
         'name': 'cnn',
-        'path': 'src/tests/ep1/cnn/cnn.com/index.html'
+        'path': 'src/tests/ep1/cnn/cnn.com/index.html',
+        'gesture_file': '/data/local/converted_cnn'
     },
     {
         'name': 'reddit',
-        'path': 'src/tests/ep1/reddit.com/www.reddit.com/index.html'
+        'path': 'src/tests/ep1/reddit.com/www.reddit.com/index.html',
+        'gesture_file': '/data/local/converted_reddit'
     },
     {
         'name': 'imgur',
-        'path': 'src/tests/ep1/imgur.com/imgur.com/gallery/index.html'
+        'path': 'src/tests/ep1/imgur.com/imgur.com/gallery/index.html',
+        'gesture_file': '/data/local/converted_imgur'
     },
     {
         'name': 'wikipedia',
-        'path': 'src/tests/ep1/en.wikipedia.org/en.wikipedia.org/wiki/Rorschach_test.html'
+        'path': 'src/tests/ep1/en.wikipedia.org/en.wikipedia.org/wiki/Rorschach_test.html',
+        'gesture_file': '/data/local/converted_wikipedia'
     }
 ]
 
@@ -79,13 +87,30 @@ def symbolicate_profile_package(profile_package, profile_path, profile_file):
     else:
         return None
 
-def runtest(dm, product, current_date, appname, appinfo, test, capture_name,
-            outputdir, datafile, data, enable_profiling=False):
+def runtest(dm, product, current_date, appinfo, test, capture_name, outputdir, datafile, data, gesture_file=None, appname=None, enable_profiling=False):
+    test_completed = False
     capture_file = os.path.join(CAPTURE_DIR,
-                                "%s-%s-%s-%s.zip" % (test['name'],
-                                                     appname,
-                                                     appinfo.get('date'),
-                                                     int(time.time())))
+                            "%s-%s-%s-%s.zip" % (test['name'],
+                                                 appname,
+                                                 appinfo.get('date'),
+                                                 int(time.time())))
+    if product['name'] != 'b2g':
+        urlparams = test.get('urlparams', '')
+
+        call_args = ["runtest.py", "--url-params", urlparams,
+                "--name", capture_name,
+                "--capture-file", capture_file,
+                appname, test['path']]
+    else:
+        call_args = ["runtest.py", "--b2g",
+                "--name", capture_name,
+                "--capture-file", capture_file]
+
+        if not gesture_file:
+            gesture_file = test.get('gesture_file', None)
+        if gesture_file:
+            call_args.extend(["--gesture-file", gesture_file])
+
     if enable_profiling:
         profile_package = os.path.join(CAPTURE_DIR,
                                        "profile-package-%s-%s-%s-%s.zip" % (test['name'],
@@ -93,17 +118,14 @@ def runtest(dm, product, current_date, appname, appinfo, test, capture_name,
                                                                             appinfo.get('date'),
                                                                             int(time.time())))
 
-    urlparams = test.get('urlparams', '')
+        args.extend(["--profile-file", profile_package])
 
-    test_completed = False
+    call_args.append(test['path'])
+
     for i in range(3):
         print "Running test (try %s of 3)" % (i+1)
 
-        args = ["runtest.py", "--url-params", urlparams,
-                "--name", capture_name, "--capture-file", capture_file ]
-        if enable_profiling:
-            args.extend(["--profile-file", profile_package])
-        retval = subprocess.call(args + [ appname, test['path'] ])
+        retval = subprocess.call(call_args)
         if retval == 0:
             test_completed = True
             break
@@ -171,10 +193,14 @@ def main(args=sys.argv[1:]):
     parser.add_option("--product",
                       action="store", dest="product",
                       help = "Restrict testing to product (options: %s)" %
-                      ", ".join([product["name"] for product in default_products]))
+                      ", ".join([p["name"] for p in default_products]))
     parser.add_option("--num-runs", action="store",
                       type = "int", dest = "num_runs",
                       help = "number of runs (default: 1)")
+    parser.add_option("--gesture_file",
+                      action="store", dest="gesture_file",
+                      default=None,
+                      help = "Use a gesture file located on the device")
 
     options, args = parser.parse_args()
     if len(args) != 2:
@@ -201,7 +227,7 @@ def main(args=sys.argv[1:]):
 
     products = default_products
     if options.product:
-        products = [product for product in default_products if product['name'] == options.product]
+        products = [p for p in default_products if p['name'] == options.product]
         if not products:
             print "ERROR: No products matching '%s'" % options.product
             sys.exit(1)
@@ -214,44 +240,68 @@ def main(args=sys.argv[1:]):
         data.update(json.loads(open(datafile).read()))
 
     device = eideticker.getDevice(options)
-
     # update the device list for the dashboard
     devices = {}
     devicefile = os.path.join(outputdir, 'devices.json')
     if os.path.isfile(devicefile):
         devices = json.loads(open(devicefile).read())['devices']
-    devices[device_id] = { 'name': device.model,
-                           'version': device.getprop('ro.build.version.release') }
+            
+    if device_id == 'Panda' and (options.product and options.product == 'b2g'):
+        print "creating manager"
+        b2g_manager = B2GManager(device)
+        appinfo = b2g_manager.get_appinfo()
+        print "gotmanager"
+        appinfo["buildid"] = appinfo["appBuildID"]
+        appinfo["revision"] = appinfo["version"]
+        devices[device_id] = { 'name': device.model,
+                               'version': appinfo['version'] }
+    else:
+        devices[device_id] = { 'name': device.model,
+                                   'version': device.getprop('ro.build.version.release') }
     with open(devicefile, 'w') as f:
         f.write(json.dumps({ 'devices': devices }))
 
     for product in products:
-        if product.get('url'):
-            product_fname = os.path.join(DOWNLOAD_DIR, "%s.apk" % product['name'])
-            appinfo = eideticker.get_fennec_appinfo(product_fname)
-            appname = appinfo['appname']
+        if product['name'] == 'b2g':
             capture_name = "%s %s" % (product['name'], appinfo['date'])
-        else:
-            appinfo = { }
-            appname = product['appname']
-            capture_name = "%s (taken on %s)" % (product['name'], current_date)
 
-        if appinfo.get('appname'):
-            appname = appinfo['appname']
-        else:
-            appname = product['appname']
+            def call_runtest():
+                 runtest(device, product, current_date, appinfo, test,
+                         capture_name + " #%s" % i, outputdir, datafile, data,
+                         gesture_file=options.gesture_file, 
+                         enable_profiling=options.enable_profiling)
 
+        else:
+            if product.get('url'):
+                product_fname = os.path.join(DOWNLOAD_DIR, "%s.apk" % product['name'])
+                appinfo = eideticker.get_fennec_appinfo(product_fname)
+                appname = appinfo['appname']
+                capture_name = "%s %s" % (product['name'], appinfo['date'])
+            else:
+                appinfo = { }
+                appname = product['appname']
+                capture_name = "%s (taken on %s)" % (product['name'], current_date)
+    
+            if appinfo.get('appname'):
+                appname = appinfo['appname']
+            else:
+                appname = product['appname']
+    
+                def call_runtest():
+                    # Kill any existing instances of the processes
+                    device.killProcess(appname)
+        
+                    # Now run the test
+                    runtest(device, product, current_date, appinfo, test,
+                            capture_name + " #%s" % i, outputdir, datafile, data, 
+                            appname=appname, enable_profiling=options.enable_profiling)
+        
+                    # Kill app after test complete
+                    device.killProcess(appname)
+    
         # Run the test the specified number of times
         for i in range(num_runs):
-            # Kill any existing instances of the processes
-            device.killProcess(appname)
-
             # Now run the test
-            runtest(device, product, current_date, appname, appinfo, test,
-                    capture_name + " #%s" % i, outputdir, datafile, data,
-                    enable_profiling=options.enable_profiling)
-
-            # Kill app after test complete
-            device.killProcess(appname)
+            call_runtest()
 
 main()
