@@ -180,7 +180,7 @@ class BrowserRunner(object):
 
             # sometimes fennec fails to start, so we'll try three times...
             for i in range(3):
-                print "Launching fennec (try %s of 3)" % (i+1)
+                print "Launching %s (try %s of 3)" % (self.appname, i+1)
                 if self.dm.launchFennec(self.appname, url=self.url, mozEnv=mozEnv, extraArgs=args):
                     return
             raise Exception("Failed to start Fennec after three tries")

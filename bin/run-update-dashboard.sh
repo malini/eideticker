@@ -3,7 +3,6 @@
 set -e
 
 EIDETICKER=$(dirname $0)/../
-TESTS="clock taskjs nightly cnn nytimes-scroll nytimes-zoom reddit wikipedia imgur"
 
 if [ -z $NUM_RUNS ]; then
     NUM_RUNS=5
@@ -15,6 +14,11 @@ fi
 
 if [ $# -gt 0 ]; then
     TESTS=$@
+else
+    if [ -z $TESTS ]; then
+        # Default set of tests
+        TESTS="clock taskjs nightly cnn nytimes-scroll nytimes-zoom reddit wikipedia imgur"
+    fi
 fi
 
 export PATH=$PATH:$HOME/tools/android-sdk-linux/tools:$HOME/tools/android-sdk-linux/platform-tools:$HOME/bin:$HOME/.local/bin
